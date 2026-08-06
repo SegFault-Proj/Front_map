@@ -350,7 +350,7 @@ http.createServer((req, res) => {
     });
   }
   if (requestPath === '/mobile' || requestPath === '/mobile.html') {
-    return fs.readFile(path.join(publicDir, 'mobile.html'), (error, data) => {
+    return fs.readFile(path.join(publicDir, 'app', 'index.html'), (error, data) => {
       if (error) return res.writeHead(404).end('Mobile page not found');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
