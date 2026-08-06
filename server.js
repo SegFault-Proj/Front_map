@@ -240,6 +240,9 @@ async function analyzeImage(buffer, roi = null) {
     } else if(type==='PHOTO'){
       const candidate=items.map(item=>{const xs=item.polygon.map(point=>point[0]),ys=item.polygon.map(point=>point[1]);return {item,ratio:(Math.max(...xs)-Math.min(...xs))/Math.max(1,Math.max(...ys)-Math.min(...ys))}}).filter(item=>item.ratio>=2).sort((a,b)=>b.ratio-a.ratio)[0];
       if(candidate)mergedColorFacilities.push(candidate.item);
+    } else if(type==='CATERING') {
+      const usable=items.filter(item=>{const xs=item.polygon.map(point=>point[0]),ys=item.polygon.map(point=>point[1]),w=Math.max(...xs)-Math.min(...xs),h=Math.max(...ys)-Math.min(...ys);return Math.max(w,h)/Math.max(1,Math.min(w,h))<2.4;});
+      mergedColorFacilities.push(...usable);
     } else {
       const points=items.flatMap(item=>item.polygon),xs=points.map(point=>point[0]),ys=points.map(point=>point[1]);
       mergedColorFacilities.push({...items[0],id:`${type}_COLOR_01`,polygon:[[Math.min(...xs),Math.min(...ys)],[Math.max(...xs),Math.min(...ys)],[Math.max(...xs),Math.max(...ys)],[Math.min(...xs),Math.max(...ys)]]});
