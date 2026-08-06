@@ -1,0 +1,217 @@
+{
+  "mapId": "venue-001",
+  "width": 1200,
+  "height": 800,
+  "spaces": [
+    {
+      "id": "SPACE_01",
+      "name": "안내데스크",
+      "type": "INFO",
+      "polygon": [
+        [
+          105,
+          485
+        ],
+        [
+          270,
+          485
+        ],
+        [
+          270,
+          615
+        ],
+        [
+          105,
+          615
+        ]
+      ]
+    },
+    {
+      "id": "SPACE_02",
+      "name": "전시관 A",
+      "type": "EXHIBITION",
+      "polygon": [
+        [
+          300,
+          180
+        ],
+        [
+          520,
+          180
+        ],
+        [
+          520,
+          450
+        ],
+        [
+          300,
+          450
+        ]
+      ]
+    },
+    {
+      "id": "SPACE_03",
+      "name": "푸드존",
+      "type": "FOOD",
+      "polygon": [
+        [
+          550,
+          180
+        ],
+        [
+          715,
+          180
+        ],
+        [
+          715,
+          405
+        ],
+        [
+          550,
+          405
+        ]
+      ]
+    },
+    {
+      "id": "SPACE_04",
+      "name": "팝업존",
+      "type": "POPUP",
+      "polygon": [
+        [
+          745,
+          180
+        ],
+        [
+          1010,
+          180
+        ],
+        [
+          1010,
+          405
+        ],
+        [
+          745,
+          405
+        ]
+      ]
+    },
+    {
+      "id": "SPACE_06",
+      "name": "전시관 B",
+      "type": "EXHIBITION",
+      "polygon": [
+        [
+          550,
+          450
+        ],
+        [
+          760,
+          450
+        ],
+        [
+          760,
+          650
+        ],
+        [
+          550,
+          650
+        ]
+      ]
+    }
+  ],
+  "walls": [],
+  "nodes": [
+    {
+      "id": "NODE_01",
+      "x": 145,
+      "y": 615,
+      "kind": "ENTRANCE"
+    },
+    {
+      "id": "NODE_02",
+      "x": 270,
+      "y": 615,
+      "kind": "WAYPOINT"
+    },
+    {
+      "id": "NODE_03",
+      "x": 270,
+      "y": 450,
+      "kind": "WAYPOINT"
+    },
+    {
+      "id": "NODE_04",
+      "x": 470,
+      "y": 450,
+      "kind": "WAYPOINT"
+    },
+    {
+      "id": "NODE_05",
+      "x": 470,
+      "y": 260,
+      "kind": "WAYPOINT"
+    },
+    {
+      "id": "NODE_06",
+      "x": 715,
+      "y": 260,
+      "kind": "WAYPOINT"
+    },
+    {
+      "id": "NODE_07",
+      "x": 715,
+      "y": 405,
+      "kind": "WAYPOINT"
+    },
+    {
+      "id": "NODE_08",
+      "x": 940,
+      "y": 405,
+      "kind": "DESTINATION"
+    }
+  ],
+  "edges": [
+    {
+      "from": "NODE_01",
+      "to": "NODE_02",
+      "distance": 125,
+      "zoneId": "PATH"
+    },
+    {
+      "from": "NODE_02",
+      "to": "NODE_03",
+      "distance": 165,
+      "zoneId": "PATH"
+    },
+    {
+      "from": "NODE_03",
+      "to": "NODE_04",
+      "distance": 200,
+      "zoneId": "PATH"
+    },
+    {
+      "from": "NODE_04",
+      "to": "NODE_05",
+      "distance": 190,
+      "zoneId": "PATH"
+    },
+    {
+      "from": "NODE_05",
+      "to": "NODE_06",
+      "distance": 245,
+      "zoneId": "PATH"
+    },
+    {
+      "from": "NODE_06",
+      "to": "NODE_07",
+      "distance": 145,
+      "zoneId": "PATH"
+    },
+    {
+      "from": "NODE_07",
+      "to": "NODE_08",
+      "distance": 225,
+      "zoneId": "PATH"
+    }
+  ]
+}

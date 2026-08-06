@@ -1,0 +1,4 @@
+.app header{height:76px;padding:0 34px;box-shadow:none}
+.app main{display:grid;grid-template-columns:260px minmax(500px,1fr) 260px;gap:17px;padding:20px;max-width:1800px}
+.app .panel,.app .stage{border-radius:18px;box-shadow:0 12px 34px #28476812}
+.app .panel{padding:21px}.app .stage{padding:18px}.app .brand{gap:10px}.app .logo{width:36px;height:36px;border-radius:11px;font-size:22px}.app .brand b{font-size:15px}.app .brand small{font-size:9px}.app .left h1{font-size:21px}.app .canvas{height:650px}.app .stage h2{font-size:18px}.app .editor-2d{padding:0;background:#f5f8f8}.app .editor-2d svg{width:96%;height:96%}

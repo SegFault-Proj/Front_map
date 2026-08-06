@@ -1,0 +1,24 @@
+{
+  "name": "hackathon-indoor-map",
+  "version": "0.1.0",
+  "private": true,
+  "description": "반자동 도면 업로드 기반 실내 내비게이션 맵 MVP",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "vite build --config vite.config.mjs",
+    "preview": "vite preview --config vite.config.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.7.0",
+    "@tweenjs/tween.js": "^25.0.0",
+    "@vitejs/plugin-react": "^6.0.5",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "sharp": "^0.35.3",
+    "three": "^0.185.1",
+    "vite": "^8.2.0",
+    "zustand": "^5.0.14"
+  }
+}
