@@ -175,13 +175,12 @@ async function analyzeImage(buffer, roi = null) {
   });
   // Connected purple components provide booth/facility candidates. Tiny text,
   // border fragments and very thin text-like components are discarded.
-  const visited = new Uint8Array(size), spaces = [];
+  const visited = new Uint8Array(size), spaces = [], facilities = [];
   for (let i=0;i<size;i++) if (purple[i] && !visited[i]) { const queue=[i]; visited[i]=1; let count=0,minX=width,maxX=0,minY=height,maxY=0;
     while(queue.length){const at=queue.pop(),x=at%width,y=Math.floor(at/width);count++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);for(const n of [at-1,at+1,at-width,at+width]){if(n>=0&&n<size&&!visited[n]&&purple[n]&&Math.abs((n%width)-x)<=1){visited[n]=1;queue.push(n)}}}
     const boxWidth=maxX-minX+1,boxHeight=maxY-minY+1, ratio=Math.max(boxWidth,boxHeight)/Math.max(1,Math.min(boxWidth,boxHeight));
-    if(count>=150 && boxWidth>=35 && boxHeight>=20 && ratio<=15 && minX>12 && minY>12 && maxX<width-12 && maxY<height-12) spaces.push({polygon:[toMap(minX,minY),toMap(maxX,minY),toMap(maxX,maxY),toMap(minX,maxY)],area:count,confidence:Number(Math.min(.95,.62+Math.min(.3,count/size*8)).toFixed(2)),source:'purple',type:'EXHIBITION',name:'홍보부스'});
+    if(count>=150 && boxWidth>=35 && boxHeight>=20 && ratio<=15 && minX>12 && minY>12 && maxX<width-12 && maxY<height-12) { const polygon=[toMap(minX,minY),toMap(maxX,minY),toMap(maxX,maxY),toMap(minX,maxY)]; spaces.push({polygon,area:count,confidence:Number(Math.min(.95,.62+Math.min(.3,count/size*8)).toFixed(2)),source:'purple',type:'EXHIBITION',name:'홍보부스'}); if(boxWidth<=180&&boxHeight>=30&&boxHeight<=140&&boxWidth/boxHeight<3) facilities.push({id:`BOOTH_${String(facilities.length+1).padStart(2,'0')}`,type:'BOOTH',name:'홍보부스',polygon,confidence:.9,source:'purple-component'}); }
   }
-  const facilities=[];
   const colorFacilityMasks=[
     {type:'PHOTO',name:'포토존',hit:(r,g,b)=>r>210&&g>120&&b>150&&r>g*1.08&&r>b*.92},
     {type:'CATERING',name:'케이터링',hit:(r,g,b)=>r>200&&g>155&&b>100&&r>b*1.18},
