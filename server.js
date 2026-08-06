@@ -349,6 +349,13 @@ http.createServer((req, res) => {
       res.end(data);
     });
   }
+  if (requestPath === '/mobile' || requestPath === '/mobile.html') {
+    return fs.readFile(path.join(publicDir, 'mobile.html'), (error, data) => {
+      if (error) return res.writeHead(404).end('Mobile page not found');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+  }
   if (requestPath.startsWith('/uploads/')) {
     const uploadName = path.basename(requestPath.slice('/uploads/'.length));
     return fs.readFile(path.join(uploadsDir, uploadName), (error, data) => {
