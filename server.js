@@ -4,11 +4,12 @@ const path = require('path');
 const sharp = require('sharp');
 const { spawn } = require('child_process');
 
-const PORT = Number(process.env.PORT || 4317);
+const PORT = Number(process.env.PORT || 4101);
 const publicDir = path.join(__dirname, 'public');
 const mapsDir = path.join(__dirname, 'data', 'maps');
 const uploadsDir = path.join(__dirname, 'data', 'uploads');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
+const aiBaseUrl = process.env.AI_BASE_URL || 'http://127.0.0.1:4000';
 
 function sendJson(res, status, payload) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -31,6 +32,31 @@ function readBody(req) {
     req.on('end', () => { if (!settled) { settled = true; resolve(body); } });
     req.on('error', error => { if (!settled) { settled = true; reject(error); } });
   });
+}
+
+function requestJson(url, options = {}, timeoutMs = 4500) {
+  return new Promise((resolve, reject) => {
+    const target = new URL(url);
+    const client = target.protocol === 'https:' ? require('https') : http;
+    const request = client.request(target, { method: options.method || 'GET', headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } }, response => {
+      let body = ''; response.setEncoding('utf8');
+      response.on('data', chunk => { body += chunk; });
+      response.on('end', () => { try { const json = JSON.parse(body || '{}'); if (response.statusCode >= 400) reject(new Error(`AI_${response.statusCode}`)); else resolve(json); } catch { reject(new Error('AI_INVALID_JSON')); } });
+    });
+    request.setTimeout(timeoutMs, () => request.destroy(new Error('AI_TIMEOUT')));
+    request.on('error', reject); if (options.body) request.write(options.body); request.end();
+  });
+}
+
+function fallbackRoute(map, startId, destinationId) {
+  const queue = [startId], previous = { [startId]: null };
+  while (queue.length) { const current = queue.shift(); if (current === destinationId) break; (map.edges || []).filter(edge => edge.from === current || edge.to === current).forEach(edge => { const next = edge.from === current ? edge.to : edge.from; if (previous[next] === undefined) { previous[next] = current; queue.push(next); } }); }
+  if (previous[destinationId] === undefined) return { path: [], edgeIds: [], routePoints: [], instructions: [], totalDistance: 0, estimatedSeconds: 0, source: 'fallback' };
+  const path = []; for (let id = destinationId; id !== null; id = previous[id]) path.unshift(id);
+  const nodes = path.map(id => (map.nodes || []).find(node => node.id === id)).filter(Boolean);
+  const edgeIds = []; let totalDistance = 0;
+  for (let i = 1; i < path.length; i++) { const edge = (map.edges || []).find(item => (item.from === path[i-1] && item.to === path[i]) || (item.to === path[i-1] && item.from === path[i])); if (edge) { edgeIds.push(edge.id || `${path[i-1]}-${path[i]}`); totalDistance += Number(edge.distance) || 0; } }
+  return { path, edgeIds, routePoints: nodes, instructions: [{ text: '우회전', distance: 20 }], totalDistance, estimatedSeconds: Math.max(60, Math.round(totalDistance / 1.1)), source: 'fallback' };
 }
 
 function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
@@ -284,6 +310,29 @@ async function analyzeImage(buffer, roi = null) {
 
 http.createServer((req, res) => {
   const requestPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+  if (requestPath === '/api/ai/health' && req.method === 'GET') {
+    return requestJson(`${aiBaseUrl}/health`, {}, 2500).then(data => sendJson(res, 200, { ok: true, ai: data, baseUrl: aiBaseUrl })).catch(() => sendJson(res, 200, { ok: false, ai: 'unavailable', baseUrl: aiBaseUrl }));
+  }
+  if (requestPath === '/api/ai/routes/preview' && req.method === 'POST') {
+    return readBody(req).then(async body => {
+      const input = JSON.parse(body || '{}');
+      const mapId = input.mapId || 'venue-001';
+      const mapPath = path.join(mapsDir, `${mapId}.json`);
+      let map;
+      try { map = JSON.parse(await fs.promises.readFile(mapPath, 'utf8')); } catch { return sendJson(res, 404, { error: 'MAP_NOT_FOUND', mapId }); }
+      const startId = input.startNodeId || input.start_id || map.nodes?.[0]?.id;
+      const destinationId = input.destinationNodeId || input.destination_id || map.nodes?.at(-1)?.id;
+      const venueMap = { id: map.mapId, name: map.mapId, image: `/map/${map.mapId}`, width: map.width, height: map.height, nodes: (map.nodes || []).map(node => ({ id: node.id, name: node.name || node.id, x: Number(node.x), y: Number(node.y), type: node.type || node.kind || 'WAYPOINT', selectable: node.selectable !== false })), edges: (map.edges || []).map(edge => ({ id: edge.id || `${edge.from}-${edge.to}`, from: edge.from, to: edge.to, distance: Number(edge.distance) || 1, widthM: edge.widthM || 2, zone: edge.zone || edge.zoneId || 'PATH', crowdRegion: edge.crowdRegion || null, bidirectional: edge.bidirectional !== false })) };
+      const fallback = fallbackRoute(map, startId, destinationId);
+      try {
+        const ai = await requestJson(`${aiBaseUrl}/route/preview`, { method: 'POST', body: JSON.stringify({ venue_map: venueMap, start_id: startId, destination_id: destinationId }) });
+        const data = ai.data || ai;
+        return sendJson(res, 200, { ok: true, data: { ...fallback, ...data, source: data.source || 'ai' }, source: data.source || 'ai' });
+      } catch (error) {
+        return sendJson(res, 200, { ok: true, data: fallback, source: 'fallback', warning: error.message });
+      }
+    }).catch(() => sendJson(res, 400, { error: 'INVALID_ROUTE_REQUEST' }));
+  }
   if (requestPath === '/api/analyze' && req.method === 'POST') {
     return readBody(req).then(body => {
       const input = JSON.parse(body);
