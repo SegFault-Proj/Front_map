@@ -4,122 +4,195 @@
   "height": 800,
   "spaces": [
     {
-      "id": "SPACE_01",
-      "name": "안내데스크",
+      "polygon": [
+        [
+          551,
+          408
+        ],
+        [
+          1048,
+          408
+        ],
+        [
+          1048,
+          592
+        ],
+        [
+          551,
+          592
+        ]
+      ],
+      "area": 91448,
+      "confidence": 0.63,
+      "source": "split-wall",
+      "name": "공간",
       "type": "INFO",
-      "polygon": [
-        [
-          105,
-          485
-        ],
-        [
-          270,
-          485
-        ],
-        [
-          270,
-          615
-        ],
-        [
-          105,
-          615
-        ]
-      ]
+      "congestion": "NORMAL",
+      "color": "#bfeee4"
     },
     {
-      "id": "SPACE_02",
-      "name": "전시관 A",
+      "polygon": [
+        [
+          198,
+          562
+        ],
+        [
+          463,
+          562
+        ],
+        [
+          463,
+          617
+        ],
+        [
+          198,
+          617
+        ]
+      ],
+      "area": 17032,
+      "confidence": 0.68,
+      "source": "closed-wall-mask",
+      "name": "공간",
+      "type": "INFO",
+      "congestion": "NORMAL",
+      "color": "#bfeee4"
+    },
+    {
+      "polygon": [
+        [
+          356,
+          343
+        ],
+        [
+          493,
+          343
+        ],
+        [
+          493,
+          371
+        ],
+        [
+          356,
+          371
+        ]
+      ],
+      "area": 4774,
+      "confidence": 0.67,
+      "source": "purple",
       "type": "EXHIBITION",
-      "polygon": [
-        [
-          300,
-          180
-        ],
-        [
-          520,
-          180
-        ],
-        [
-          520,
-          450
-        ],
-        [
-          300,
-          450
-        ]
-      ]
+      "name": "홍보부스",
+      "congestion": "NORMAL",
+      "color": "#cfe0ff"
     },
     {
-      "id": "SPACE_03",
-      "name": "푸드존",
-      "type": "FOOD",
       "polygon": [
         [
-          550,
-          180
+          178,
+          193
         ],
         [
-          715,
-          180
+          231,
+          193
         ],
         [
-          715,
-          405
+          231,
+          239
         ],
         [
-          550,
-          405
+          178,
+          239
         ]
-      ]
+      ],
+      "area": 2546,
+      "confidence": 0.68,
+      "source": "closed-wall-mask",
+      "name": "공간",
+      "type": "INFO",
+      "congestion": "NORMAL",
+      "color": "#bfeee4"
     },
     {
-      "id": "SPACE_04",
-      "name": "팝업존",
-      "type": "POPUP",
       "polygon": [
         [
-          745,
-          180
+          181,
+          252
         ],
         [
-          1010,
-          180
+          226,
+          252
         ],
         [
-          1010,
-          405
+          226,
+          289
         ],
         [
-          745,
-          405
+          181,
+          289
         ]
-      ]
+      ],
+      "area": 1957,
+      "confidence": 0.68,
+      "source": "closed-wall-mask",
+      "name": "공간",
+      "type": "INFO",
+      "congestion": "NORMAL",
+      "color": "#bfeee4"
     },
     {
-      "id": "SPACE_06",
-      "name": "전시관 B",
-      "type": "EXHIBITION",
+      "id": "LABEL_SPACE_01",
+      "name": "101",
+      "type": "COMMON_AREA",
       "polygon": [
         [
-          550,
-          450
+          596,
+          165
         ],
         [
-          760,
-          450
+          805,
+          165
         ],
         [
-          760,
-          650
+          805,
+          248
         ],
         [
-          550,
-          650
+          596,
+          248
         ]
-      ]
+      ],
+      "confidence": 0.84,
+      "source": "ocr-room-label",
+      "congestion": "NORMAL",
+      "color": "#e4d8ff"
+    },
+    {
+      "id": "LABEL_SPACE_02",
+      "name": "102",
+      "type": "COMMON_AREA",
+      "polygon": [
+        [
+          805,
+          165
+        ],
+        [
+          1013,
+          165
+        ],
+        [
+          1013,
+          330
+        ],
+        [
+          805,
+          330
+        ]
+      ],
+      "confidence": 0.84,
+      "source": "ocr-room-label",
+      "congestion": "NORMAL",
+      "color": "#e4d8ff"
     }
   ],
-  "walls": [],
   "nodes": [
     {
       "id": "NODE_01",
@@ -213,5 +286,6 @@
       "distance": 225,
       "zoneId": "PATH"
     }
-  ]
+  ],
+  "walls": []
 }

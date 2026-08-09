@@ -12,6 +12,6 @@ export default defineConfig({
   build: {
     outDir: '../public/app',
     emptyOutDir: true,
-    rollupOptions: { output: { entryFileNames: 'index.js', chunkFileNames: 'chunks/[name].js', assetFileNames: 'assets/[name][extname]' } },
+    rollupOptions: { output: { entryFileNames: 'index.[hash].js', chunkFileNames: 'chunks/[name].[hash].js', assetFileNames: 'assets/[name].[hash][extname]' } },
   },
 });

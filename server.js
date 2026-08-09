@@ -262,10 +262,10 @@ async function analyzeImage(buffer, roi = null) {
   const internalSeen = new Uint8Array(size), structuralSpaces=[];
   for(let start=0;start<size;start++) if(!wallMask[start]&&!outside[start]&&!internalSeen[start]){const cells=[start];internalSeen[start]=1;let count=0,minX=width,maxX=0,minY=height,maxY=0;for(let head=0;head<cells.length;head++){const at=cells[head],x=at%width,y=Math.floor(at/width);count++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);for(const next of [at-1,at+1,at-width,at+width]){if(next<0||next>=size||internalSeen[next]||wallMask[next]||outside[next])continue;if(Math.abs((next%width)-x)>1)continue;internalSeen[next]=1;cells.push(next)}}const boxWidth=maxX-minX+1,boxHeight=maxY-minY+1;if(count>=size*.002&&count<=size*.45&&boxWidth>35&&boxHeight>25)structuralSpaces.push({polygon:[toMap(minX,minY),toMap(maxX,minY),toMap(maxX,maxY),toMap(minX,maxY)],area:count,confidence:.68,source:'closed-wall-mask'})}
   const allSpaces=[...structuralSpaces,...spaces];
-  const uniqueSpaces=[];allSpaces.sort((a,b)=>b.area-a.area).forEach(space=>{const p=space.polygon,xs=p.map(point=>point[0]),ys=p.map(point=>point[1]),box={x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};const duplicate=uniqueSpaces.some(other=>{const q=other.polygon,qx=q.map(point=>point[0]),qy=q.map(point=>point[1]);const overlapX=Math.max(0,Math.min(box.x+box.w,Math.max(...qx))-Math.max(box.x,Math.min(...qx)));const overlapY=Math.max(0,Math.min(box.y+box.h,Math.max(...qy))-Math.max(box.y,Math.min(...qy)));const otherArea=(Math.max(...qx)-Math.min(...qx))*(Math.max(...qy)-Math.min(...qy));return overlapX*overlapY>Math.min(box.w*box.h,otherArea)*.55});if(!duplicate)uniqueSpaces.push(space)});
+  const uniqueSpaces=[];allSpaces.sort((a,b)=>b.area-a.area).forEach(space=>{const p=space.polygon,xs=p.map(point=>point[0]),ys=p.map(point=>point[1]),box={x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};const duplicate=uniqueSpaces.some(other=>{const q=other.polygon,qx=q.map(point=>point[0]),qy=q.map(point=>point[1]);const overlapX=Math.max(0,Math.min(box.x+box.w,Math.max(...qx))-Math.max(box.x,Math.min(...qx)));const overlapY=Math.max(0,Math.min(box.y+box.h,Math.max(...qy))-Math.max(box.y,Math.min(...qy)));const otherArea=(Math.max(...qx)-Math.min(...qx))*(Math.max(...qy)-Math.min(...qy));return overlapX*overlapY>Math.min(box.w*box.h,otherArea)*.82});if(!duplicate)uniqueSpaces.push(space)});
   // A large closed region may contain a long internal divider. Split its
   // bounding polygon into smaller editor-friendly space candidates.
-  const splitSpaces=[];uniqueSpaces.forEach(space=>{const points=space.polygon,xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),box={x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};if(box.w<300||box.h<180){splitSpaces.push(space);return}const verticalCuts=filteredLines.filter(line=>!line.horizontal&&line.status!=='NOISE'&&line.x1>box.x+25&&line.x1<box.x+box.w-25&&Math.min(line.y1,line.y2)<=box.y+box.h*.2&&Math.max(line.y1,line.y2)>=box.y+box.h*.8).map(line=>line.x1).sort((a,b)=>a-b);const horizontalCuts=filteredLines.filter(line=>line.horizontal&&line.status!=='NOISE'&&line.y1>box.y+25&&line.y1<box.y+box.h-25&&Math.min(line.x1,line.x2)<=box.x+box.w*.2&&Math.max(line.x1,line.x2)>=box.x+box.w*.8).map(line=>line.y1).sort((a,b)=>a-b);const xCuts=[box.x,...verticalCuts.slice(0,2),box.x+box.w],yCuts=[box.y,...horizontalCuts.slice(0,2),box.y+box.h];for(let xi=0;xi<xCuts.length-1;xi++)for(let yi=0;yi<yCuts.length-1;yi++){const x1=xCuts[xi],x2=xCuts[xi+1],y1=yCuts[yi],y2=yCuts[yi+1];if(x2-x1>60&&y2-y1>50)splitSpaces.push({polygon:[[x1,y1],[x2,y1],[x2,y2],[x1,y2]],area:(x2-x1)*(y2-y1),confidence:Math.max(.55,space.confidence-.05),source:'split-wall'})}});
+  const splitSpaces=[];uniqueSpaces.forEach(space=>{const points=space.polygon,xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),box={x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};if(box.w<260||box.h<150){splitSpaces.push(space);return}const verticalCuts=filteredLines.filter(line=>!line.horizontal&&line.status!=='NOISE'&&line.x1>box.x+25&&line.x1<box.x+box.w-25&&Math.min(line.y1,line.y2)<=box.y+box.h*.35&&Math.max(line.y1,line.y2)>=box.y+box.h*.65).map(line=>line.x1).sort((a,b)=>a-b);const horizontalCuts=filteredLines.filter(line=>line.horizontal&&line.status!=='NOISE'&&line.y1>box.y+25&&line.y1<box.y+box.h-25&&Math.min(line.x1,line.x2)<=box.x+box.w*.35&&Math.max(line.x1,line.x2)>=box.x+box.w*.65).map(line=>line.y1).sort((a,b)=>a-b);const xCuts=[box.x,...verticalCuts.slice(0,3),box.x+box.w],yCuts=[box.y,...horizontalCuts.slice(0,3),box.y+box.h];for(let xi=0;xi<xCuts.length-1;xi++)for(let yi=0;yi<yCuts.length-1;yi++){const x1=xCuts[xi],x2=xCuts[xi+1],y1=yCuts[yi],y2=yCuts[yi+1];if(x2-x1>60&&y2-y1>50)splitSpaces.push({polygon:[[x1,y1],[x2,y1],[x2,y2],[x1,y2]],area:(x2-x1)*(y2-y1),confidence:Math.max(.55,space.confidence-.05),source:'split-wall'})}});
   const textCandidates=ocrWords.map(word=>{const localX=word.x/Math.max(1,Math.round(sourceWidth*safeRoi.width))*width,localY=word.y/Math.max(1,Math.round(sourceHeight*safeRoi.height))*height;const p=toMap(localX,localY);return {...word,x:p[0],y:p[1],width:Math.round(word.width/Math.max(1,Math.round(sourceWidth*safeRoi.width))*1060),height:Math.round(word.height/Math.max(1,Math.round(sourceHeight*safeRoi.height))*580)}});
   // Use clean Korean semantic matching alongside the legacy detector. The old
   // patterns are kept for backward compatibility with earlier saved results.
@@ -324,11 +324,11 @@ async function analyzeImage(buffer, roi = null) {
   });
   const graphNodes=[], graphEdges=[];const nodeFor=(x,y)=>{let node=graphNodes.find(item=>Math.hypot(item.x-x,item.y-y)<=15);if(!node){node={id:`N${String(graphNodes.length+1).padStart(3,'0')}`,x:Math.round(x),y:Math.round(y)};graphNodes.push(node)}return node.id};filteredLines.filter(line=>line.status!=='NOISE').forEach(line=>{const from=nodeFor(line.x1,line.y1),to=nodeFor(line.x2,line.y2);graphEdges.push({from,to,status:line.status})});
   const cleanTextCandidates=textCandidates.filter(word=>word.confidence>=58&&word.text.trim().length>=2&&!/^[^\p{L}\p{N}]+$/u.test(word.text)&&!/^공간\s*\d+$/u.test(word.text));
-  return { width:1200, height:800, sourceWidth, sourceHeight, roi:safeRoi, normalized:true, colorLayer:purpleCount > size * .002 ? 'purple+structural' : 'structural', analysisMode:'roi-multi-detector-semantic-v8-room-labels', lines:filteredLines.slice(0,80), spaces:[...splitSpaces,...uniqueLabelSpaces].slice(0,48), facilities, textCandidates:cleanTextCandidates, topology:{nodes:graphNodes,edges:graphEdges}, confidence:{confirmedLines:filteredLines.filter(line=>line.status==='CONFIRMED').length,candidateLines:filteredLines.filter(line=>line.status==='CANDIDATE').length,noiseLines:filteredLines.filter(line=>line.status==='NOISE').length,autoConfirmedSpaces:splitSpaces.filter(space=>space.confidence>=.9).length,labelSpaces:uniqueLabelSpaces.length}, structuralSpaceCount:structuralSpaces.length };
+  return { width:1200, height:800, sourceWidth, sourceHeight, roi:safeRoi, normalized:true, colorLayer:purpleCount > size * .002 ? 'purple+structural' : 'structural', analysisMode:'roi-multi-detector-semantic-v8-room-labels', lines:filteredLines.slice(0,80), spaces:[...splitSpaces,...spaces,...uniqueLabelSpaces].slice(0,64), facilities, textCandidates:cleanTextCandidates, topology:{nodes:graphNodes,edges:graphEdges}, confidence:{confirmedLines:filteredLines.filter(line=>line.status==='CONFIRMED').length,candidateLines:filteredLines.filter(line=>line.status==='CANDIDATE').length,noiseLines:filteredLines.filter(line=>line.status==='NOISE').length,autoConfirmedSpaces:splitSpaces.filter(space=>space.confidence>=.9).length,labelSpaces:uniqueLabelSpaces.length}, structuralSpaceCount:structuralSpaces.length };
 }
 
 http.createServer((req, res) => {
-  const requestPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
+  const requestPath = req.url === '/' ? '/' : req.url.split('?')[0];
   if (requestPath === '/api/ai/health' && req.method === 'GET') {
     return requestJson(`${aiBaseUrl}/health`, {}, 2500).then(data => sendJson(res, 200, { ok: true, ai: data, baseUrl: aiBaseUrl })).catch(() => sendJson(res, 200, { ok: false, ai: 'unavailable', baseUrl: aiBaseUrl }));
   }
@@ -430,7 +430,7 @@ http.createServer((req, res) => {
     });
   }
   if (requestPath === '/mobile' || requestPath === '/mobile.html') {
-    return fs.readFile(path.join(publicDir, 'mobile.html'), (error, data) => {
+    return fs.readFile(path.join(publicDir, 'app', 'index.html'), (error, data) => {
       if (error) return res.writeHead(404).end('Mobile page not found');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
@@ -445,7 +445,14 @@ http.createServer((req, res) => {
     });
   }
   if (requestPath === '/' || requestPath === '') {
-    return fs.readFile(path.join(publicDir, 'index.html'), (error, data) => {
+    return fs.readFile(path.join(publicDir, 'app', 'index.html'), (error, data) => {
+      if (error) return res.writeHead(404).end('Build the React app first: npm run build');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(data);
+    });
+  }
+  if (requestPath === '/app' || requestPath === '/app/') {
+    return fs.readFile(path.join(publicDir, 'app', 'index.html'), (error, data) => {
       if (error) return res.writeHead(404).end('Build the React app first: npm run build');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
