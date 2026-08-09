@@ -1,7 +1,9 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const sharp = require('sharp');
+const QRCode = require('qrcode');
 const { spawn } = require('child_process');
 
 const PORT = Number(process.env.PORT || 4101);
@@ -10,6 +12,14 @@ const mapsDir = path.join(__dirname, 'data', 'maps');
 const uploadsDir = path.join(__dirname, 'data', 'uploads');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 const aiBaseUrl = process.env.AI_BASE_URL || 'http://127.0.0.1:4000';
+
+function lanAddress() {
+  const interfaces = os.networkInterfaces();
+  for (const entries of Object.values(interfaces)) for (const entry of entries || []) {
+    if (entry.family === 'IPv4' && !entry.internal && !entry.address.startsWith('169.254.')) return entry.address;
+  }
+  return 'localhost';
+}
 
 function sendJson(res, status, payload) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -83,8 +93,11 @@ async function runOcr(buffer) {
   const metadata = await sharp(buffer).metadata();
   const width = metadata.width || 1, height = metadata.height || 1;
   const results = await Promise.all([0, 90, 270].flatMap(angle => [11, 6].map(async psm => {
-    const rotated = angle ? await sharp(buffer).rotate(angle).png().toBuffer() : buffer;
-    const words = await runTesseract(rotated, psm);
+      const rotated = angle ? await sharp(buffer).rotate(angle).png().toBuffer() : buffer;
+      // Architectural drawings contain thin gray strokes and colored label
+      // boxes. Normalize them before OCR so Korean glyphs survive the scan.
+      const prepared = await sharp(rotated).grayscale().normalize().sharpen({ sigma: 1.1 }).png().toBuffer();
+      const words = [...await runTesseract(rotated, psm), ...await runTesseract(prepared, psm)];
     return words.map(word => {
       const corners = [[word.x, word.y], [word.x + word.width, word.y], [word.x, word.y + word.height], [word.x + word.width, word.y + word.height]].map(([x, y]) => {
         if (angle === 90) return [y, height - x];
@@ -254,6 +267,12 @@ async function analyzeImage(buffer, roi = null) {
   // bounding polygon into smaller editor-friendly space candidates.
   const splitSpaces=[];uniqueSpaces.forEach(space=>{const points=space.polygon,xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),box={x:Math.min(...xs),y:Math.min(...ys),w:Math.max(...xs)-Math.min(...xs),h:Math.max(...ys)-Math.min(...ys)};if(box.w<300||box.h<180){splitSpaces.push(space);return}const verticalCuts=filteredLines.filter(line=>!line.horizontal&&line.status!=='NOISE'&&line.x1>box.x+25&&line.x1<box.x+box.w-25&&Math.min(line.y1,line.y2)<=box.y+box.h*.2&&Math.max(line.y1,line.y2)>=box.y+box.h*.8).map(line=>line.x1).sort((a,b)=>a-b);const horizontalCuts=filteredLines.filter(line=>line.horizontal&&line.status!=='NOISE'&&line.y1>box.y+25&&line.y1<box.y+box.h-25&&Math.min(line.x1,line.x2)<=box.x+box.w*.2&&Math.max(line.x1,line.x2)>=box.x+box.w*.8).map(line=>line.y1).sort((a,b)=>a-b);const xCuts=[box.x,...verticalCuts.slice(0,2),box.x+box.w],yCuts=[box.y,...horizontalCuts.slice(0,2),box.y+box.h];for(let xi=0;xi<xCuts.length-1;xi++)for(let yi=0;yi<yCuts.length-1;yi++){const x1=xCuts[xi],x2=xCuts[xi+1],y1=yCuts[yi],y2=yCuts[yi+1];if(x2-x1>60&&y2-y1>50)splitSpaces.push({polygon:[[x1,y1],[x2,y1],[x2,y2],[x1,y2]],area:(x2-x1)*(y2-y1),confidence:Math.max(.55,space.confidence-.05),source:'split-wall'})}});
   const textCandidates=ocrWords.map(word=>{const localX=word.x/Math.max(1,Math.round(sourceWidth*safeRoi.width))*width,localY=word.y/Math.max(1,Math.round(sourceHeight*safeRoi.height))*height;const p=toMap(localX,localY);return {...word,x:p[0],y:p[1],width:Math.round(word.width/Math.max(1,Math.round(sourceWidth*safeRoi.width))*1060),height:Math.round(word.height/Math.max(1,Math.round(sourceHeight*safeRoi.height))*580)}});
+  // Use clean Korean semantic matching alongside the legacy detector. The old
+  // patterns are kept for backward compatibility with earlier saved results.
+  const groupedTextCandidates=[];
+  [...textCandidates].sort((a,b)=>a.y-b.y||a.x-b.x).forEach(word=>{const previous=groupedTextCandidates.at(-1);const close=previous&&Math.abs(previous.y-word.y)<=24&&word.x-(previous.x+previous.width)<=150;if(close){previous.text=`${previous.text} ${word.text}`.trim();const right=Math.max(previous.x+previous.width,word.x+word.width);previous.width=right-previous.x;previous.height=Math.max(previous.height,word.height);previous.confidence=Math.max(previous.confidence,word.confidence)}else groupedTextCandidates.push({...word})});
+  const semanticPatternsFixed=[['DOOR',/(문|출입|door|dr\.?\d*)/i],['WINDOW',/(창|window)/i],['INFO',/(안내|데스크|info|desk)/i],['PHOTO',/(포토|사진|photo)/i],['CATERING',/(케이터링|식음|푸드|catering|food)/i],['BOOTH',/(부스|홍보|팝업|booth|popup)/i],['STAIR',/(계단|stair|stairs|up|down)/i],['ELEVATOR',/(엘리베이터|승강기|elevator|lift|e\s*[\\/-]?\s*v|e\s*[\\/-]?\s*l)/i]];
+  groupedTextCandidates.forEach(text=>{const match=semanticPatternsFixed.find(([,pattern])=>pattern.test(text.text));if(!match)return;const [type]=match;const dimensions={CATERING:[190,120],BOOTH:[180,110],INFO:[130,75],PHOTO:[150,95],STAIR:[90,140],ELEVATOR:[100,100],DOOR:[55,28],WINDOW:[90,24]}[type]||[110,64];const x=Math.max(75,text.x+text.width/2-dimensions[0]/2),y=Math.max(125,text.y+text.height/2-dimensions[1]/2);facilities.push({id:`${type}_OCR_${String(facilities.length+1).padStart(2,'0')}`,type,name:text.text,polygon:[[x,y],[x+dimensions[0],y],[x+dimensions[0],y+dimensions[1]],[x,y+dimensions[1]]],confidence:Number(Math.min(.94,.55+text.confidence/200).toFixed(2)),source:'ocr-semantic-fixed'})});
   const semanticPatterns=[['DOOR',/(문|door|dr\.?\d*)/i],['WINDOW',/(창|window)/i],['INFO',/(안내|데스크|info|desk)/i],['PHOTO',/(포토|사진|photo)/i],['CATERING',/(케이터링|catering|food)/i],['BOOTH',/(홍보|부스|booth|popup)/i],['STAIR',/(계단|stair|stairs|up|down)/i],['ELEVATOR',/(엘리베이터|승강기|elevator|lift|e\s*[\\/-]?\s*v|e\s*[\\/-]?\s*l)/i]];
   textCandidates.forEach(text=>{const match=semanticPatterns.find(([,pattern])=>pattern.test(text.text));if(!match)return;const [type]=match;const dimensions={CATERING:[190,120],BOOTH:[180,110],INFO:[130,75],PHOTO:[150,95],STAIR:[90,140],ELEVATOR:[100,100],DOOR:[55,28],WINDOW:[90,24]}[type]||[110,64];const x=Math.max(75,text.x-dimensions[0]/2),y=Math.max(125,text.y-dimensions[1]/2);facilities.push({id:`${type}_${String(facilities.length+1).padStart(2,'0')}`,type,name:text.text,polygon:[[x,y],[x+dimensions[0],y],[x+dimensions[0],y+dimensions[1]],[x,y+dimensions[1]]],confidence:Number(Math.min(.94,.55+text.confidence/200).toFixed(2)),source:'ocr-semantic'})});
   const colorFacilities=facilities.filter(item=>item.source==='color-semantic');
@@ -312,6 +331,18 @@ http.createServer((req, res) => {
   const requestPath = req.url === '/' ? '/index.html' : req.url.split('?')[0];
   if (requestPath === '/api/ai/health' && req.method === 'GET') {
     return requestJson(`${aiBaseUrl}/health`, {}, 2500).then(data => sendJson(res, 200, { ok: true, ai: data, baseUrl: aiBaseUrl })).catch(() => sendJson(res, 200, { ok: false, ai: 'unavailable', baseUrl: aiBaseUrl }));
+  }
+  if (requestPath === '/api/access-url' && req.method === 'GET') {
+    const host = lanAddress();
+    const configuredBase = process.env.PUBLIC_BASE_URL;
+    const base = configuredBase ? configuredBase.replace(/\/$/, '') : `http://${host}:${PORT}`;
+    return sendJson(res, 200, { host, secure: base.startsWith('https://'), url: `${base}/mobile?map=venue-001&start=NODE_01` });
+  }
+  if (requestPath === '/api/qr' && req.method === 'GET') {
+    const query = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
+    const data = query.get('data');
+    if (!data) return sendJson(res, 400, { error: 'QR_DATA_REQUIRED' });
+    return QRCode.toBuffer(data, { type: 'png', width: 420, margin: 2, color: { dark: '#142b4a', light: '#ffffff' } }).then(buffer => { res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'no-store' }); res.end(buffer); }).catch(() => sendJson(res, 400, { error: 'QR_GENERATION_FAILED' }));
   }
   if (requestPath === '/api/ai/routes/preview' && req.method === 'POST') {
     return readBody(req).then(async body => {
@@ -399,7 +430,7 @@ http.createServer((req, res) => {
     });
   }
   if (requestPath === '/mobile' || requestPath === '/mobile.html') {
-    return fs.readFile(path.join(publicDir, 'app', 'index.html'), (error, data) => {
+    return fs.readFile(path.join(publicDir, 'mobile.html'), (error, data) => {
       if (error) return res.writeHead(404).end('Mobile page not found');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);
@@ -414,7 +445,7 @@ http.createServer((req, res) => {
     });
   }
   if (requestPath === '/' || requestPath === '') {
-    return fs.readFile(path.join(publicDir, 'app', 'index.html'), (error, data) => {
+    return fs.readFile(path.join(publicDir, 'index.html'), (error, data) => {
       if (error) return res.writeHead(404).end('Build the React app first: npm run build');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(data);

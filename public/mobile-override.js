@@ -1,0 +1,30 @@
+(function () {
+  const phone = document.querySelector('.phone');
+  if (!phone) return;
+  const style = document.createElement('style');
+  style.textContent = '.phone.show-welcome> :not(.welcome){display:none!important}.map-card img,.guide{display:none}.welcome{min-height:100vh;padding:42px 24px 28px;display:flex;flex-direction:column;justify-content:center;background:radial-gradient(circle at 80% 12%,#d9f6ef 0,transparent 34%),linear-gradient(145deg,#fff,#eefafa)}.welcome-logo{font-size:17px;font-weight:900;letter-spacing:.08em;color:#10294b}.welcome-logo small{display:block;color:#10ae98;font-size:10px;letter-spacing:.14em;margin-top:5px}.welcome h1{font-size:32px;line-height:1.2;letter-spacing:-.07em;margin:28px 0 12px}.welcome h1 em{font-style:normal;color:#10ae98}.welcome p{color:#718198;font-size:13px;line-height:1.7}.welcome-art{height:260px;margin:18px 0;position:relative;border-radius:25px;background:linear-gradient(145deg,#e7f8f4,#edf3ff);overflow:hidden;display:grid;place-items:center}.welcome-grid{width:82%;height:68%;border:12px solid #78909c;border-radius:12px;transform:skewY(-7deg);background:repeating-linear-gradient(90deg,#d5f4ed 0 18%,#fff 18% 20%,#d8e7ff 20% 42%,#fff 42% 44%,#ffe7bd 44% 72%,#fff 72% 74%,#eadcff 74% 100%);box-shadow:0 18px 25px #315c7933}.welcome button{border:0;border-radius:14px;padding:15px;background:#176dff;color:#fff;font-size:14px;font-weight:900;box-shadow:0 12px 24px #176dff40}.welcome small{color:#94a2ad;text-align:center;margin-top:12px;font-size:10px}.mini-dynamic-map{width:100%;height:100%;display:block}.mini-dynamic-map text{font-size:15px;font-weight:900;fill:#10294b}.mini-dynamic-map .top{stroke:#fff;stroke-width:3}.mini-dynamic-map .side{stroke:#a6bec6;stroke-width:2}';
+  document.head.appendChild(style);
+  const welcome = document.createElement('section');
+  welcome.className = 'welcome';
+  welcome.innerHTML = '<div class="welcome-logo">LIVE MINIATURE<small>INDOOR NAVIGATION</small></div><h1>실내 공간을 한눈에<br/><em>목적지까지 안내받아요</em></h1><p>실시간 공간 데이터를 반영해 현재 위치와 목적지를 안내합니다.</p><div class="welcome-art"><div class="welcome-grid"></div></div><button>지도 보기 <span>→</span></button><small>지도 데이터 · venue-001</small>';
+  phone.classList.add('show-welcome');
+  phone.prepend(welcome);
+  welcome.querySelector('button').addEventListener('click', () => { phone.classList.remove('show-welcome'); welcome.remove(); });
+  const ns = 'http://www.w3.org/2000/svg';
+  const params = new URLSearchParams(location.search);
+  const mapId = params.get('map') || 'venue-001';
+  const pointsFor = space => Array.isArray(space.polygon) ? space.polygon : (typeof space.points === 'string' ? space.points.trim().split(/\s+/).map(point => point.split(',').map(Number)) : []);
+  fetch('/api/maps/' + mapId).then(response => response.json()).then(map => {
+    const image = document.querySelector('.map-card img');
+    if (!image) return;
+    const svg = document.createElementNS(ns, 'svg');
+    svg.classList.add('mini-dynamic-map'); svg.setAttribute('viewBox', '0 0 1200 800');
+    const base = document.createElementNS(ns, 'rect');
+    base.setAttribute('x','45'); base.setAttribute('y','80'); base.setAttribute('width','1110'); base.setAttribute('height','640'); base.setAttribute('rx','24'); base.setAttribute('fill','#f8fdfc'); base.setAttribute('stroke','#d7e6e8'); base.setAttribute('stroke-width','9'); svg.appendChild(base);
+    const colors = {INFO:'#d5f4ed',EXHIBITION:'#d8e7ff',FOOD:'#fff0cf',POPUP:'#ffe0dc',REST:'#d5f4ed',COMMON_AREA:'#f4e5ff'};
+    (map.spaces || []).forEach(space => { const points = pointsFor(space); if (points.length < 3) return; const side = document.createElementNS(ns,'polygon'); side.classList.add('side'); side.setAttribute('points', points.map(point => `${point[0]+12},${point[1]+22}`).join(' ')+' '+points.map(point=>point.join(',')).join(' ')); side.setAttribute('fill','#b8cdd0'); svg.appendChild(side); const top = document.createElementNS(ns,'polygon'); top.classList.add('top'); top.setAttribute('points', points.map(point=>point.join(',')).join(' ')); top.setAttribute('fill',space.color||colors[space.type]||'#e2ecf5'); svg.appendChild(top); const xs=points.map(point=>point[0]), ys=points.map(point=>point[1]); const label=document.createElementNS(ns,'text'); label.setAttribute('x',(Math.min(...xs)+Math.max(...xs))/2); label.setAttribute('y',(Math.min(...ys)+Math.max(...ys))/2); label.setAttribute('text-anchor','middle'); label.textContent=space.name||space.id; svg.appendChild(label); });
+    image.replaceWith(svg);
+    const routeSvg = document.querySelector('.route');
+    if (routeSvg) fetch('/api/ai/routes/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mapId,startNodeId:params.get('start')||map.nodes?.[0]?.id,destinationNodeId:'NODE_08'})}).then(response=>response.json()).then(body=>{const route=(body.data||body).routePoints||[];if(route.length)routeSvg.querySelectorAll('polyline').forEach(line=>line.setAttribute('points',route.map(point=>`${point.x},${point.y}`).join(' ')));}).catch(()=>{});
+  }).catch(() => {});
+})();
