@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -12,6 +13,13 @@ const mapsDir = path.join(__dirname, 'data', 'maps');
 const uploadsDir = path.join(__dirname, 'data', 'uploads');
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 const aiBaseUrl = process.env.AI_BASE_URL || 'http://127.0.0.1:4000';
+const tlsKey = process.env.TLS_KEY ? path.resolve(process.env.TLS_KEY) : path.join(__dirname, 'certs', 'localhost-key.pem');
+const tlsCert = process.env.TLS_CERT ? path.resolve(process.env.TLS_CERT) : path.join(__dirname, 'certs', 'localhost.pem');
+const tlsPfx = process.env.TLS_PFX ? path.resolve(process.env.TLS_PFX) : path.join(__dirname, 'certs', 'localhost.pfx');
+const tlsPfxPassword = process.env.TLS_PFX_PASSWORD || 'live-miniature';
+const usePfx = fs.existsSync(tlsPfx);
+const useHttps = usePfx || (fs.existsSync(tlsKey) && fs.existsSync(tlsCert));
+let latestIndoorPosition = null;
 
 function lanAddress() {
   const interfaces = os.networkInterfaces();
@@ -327,7 +335,7 @@ async function analyzeImage(buffer, roi = null) {
   return { width:1200, height:800, sourceWidth, sourceHeight, roi:safeRoi, normalized:true, colorLayer:purpleCount > size * .002 ? 'purple+structural' : 'structural', analysisMode:'roi-multi-detector-semantic-v8-room-labels', lines:filteredLines.slice(0,80), spaces:[...splitSpaces,...spaces,...uniqueLabelSpaces].slice(0,64), facilities, textCandidates:cleanTextCandidates, topology:{nodes:graphNodes,edges:graphEdges}, confidence:{confirmedLines:filteredLines.filter(line=>line.status==='CONFIRMED').length,candidateLines:filteredLines.filter(line=>line.status==='CANDIDATE').length,noiseLines:filteredLines.filter(line=>line.status==='NOISE').length,autoConfirmedSpaces:splitSpaces.filter(space=>space.confidence>=.9).length,labelSpaces:uniqueLabelSpaces.length}, structuralSpaceCount:structuralSpaces.length };
 }
 
-http.createServer((req, res) => {
+const serverHandler = (req, res) => {
   const requestPath = req.url === '/' ? '/' : req.url.split('?')[0];
   if (requestPath === '/api/ai/health' && req.method === 'GET') {
     return requestJson(`${aiBaseUrl}/health`, {}, 2500).then(data => sendJson(res, 200, { ok: true, ai: data, baseUrl: aiBaseUrl })).catch(() => sendJson(res, 200, { ok: false, ai: 'unavailable', baseUrl: aiBaseUrl }));
@@ -335,9 +343,11 @@ http.createServer((req, res) => {
   if (requestPath === '/api/access-url' && req.method === 'GET') {
     const host = lanAddress();
     const configuredBase = process.env.PUBLIC_BASE_URL;
-    const base = configuredBase ? configuredBase.replace(/\/$/, '') : `http://${host}:${PORT}`;
+    const base = configuredBase ? configuredBase.replace(/\/$/, '') : `${useHttps ? 'https' : 'http'}://${host}:${PORT}`;
     return sendJson(res, 200, { host, secure: base.startsWith('https://'), url: `${base}/mobile?map=venue-001&start=NODE_01` });
   }
+  if (requestPath === '/api/position' && req.method === 'GET') return sendJson(res, 200, { ok: true, position: latestIndoorPosition, source: latestIndoorPosition?.source || 'none' });
+  if (requestPath === '/api/position' && req.method === 'POST') return readBody(req).then(body => { const position = JSON.parse(body || '{}'); if (!Number.isFinite(Number(position.x)) || !Number.isFinite(Number(position.y))) return sendJson(res, 400, { error: 'POSITION_XY_REQUIRED' }); latestIndoorPosition = { x: Number(position.x), y: Number(position.y), nodeId: position.nodeId || null, source: position.source || 'wifi', updatedAt: new Date().toISOString() }; return sendJson(res, 200, { ok: true, position: latestIndoorPosition }); }).catch(() => sendJson(res, 400, { error: 'INVALID_POSITION' }));
   if (requestPath === '/api/qr' && req.method === 'GET') {
     const query = new URL(req.url, `http://${req.headers.host || 'localhost'}`).searchParams;
     const data = query.get('data');
@@ -466,4 +476,6 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': mime[path.extname(filePath)] || 'application/octet-stream' });
     res.end(data);
   });
-}).listen(PORT, () => console.log(`Indoor map MVP running at http://localhost:${PORT}`));
+};
+const server = useHttps ? https.createServer(usePfx ? { pfx: fs.readFileSync(tlsPfx), passphrase: tlsPfxPassword } : { key: fs.readFileSync(tlsKey), cert: fs.readFileSync(tlsCert) }, serverHandler) : http.createServer(serverHandler);
+server.listen(PORT, () => console.log(`Indoor map MVP running at ${useHttps ? 'https' : 'http'}://localhost:${PORT}`));

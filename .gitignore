@@ -4,3 +4,4 @@ data/uploads/*
 !data/uploads/.gitkeep
 *.log
 .DS_Store
+certs/
